@@ -20,4 +20,5 @@ tqdm
 requests
 pandas
 qrcode[pil]
-protobuf==4.25.9
+bcrypt==4.0.1
+pydantic[email]
