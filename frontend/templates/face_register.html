@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Face Registration — AttendX</title>
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+<style>
+  .face-wrap { max-width: 560px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .cam-box {
+    position: relative; width: 100%; aspect-ratio: 4/3;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius-lg); overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #video, #preview-img { width: 100%; height: 100%; object-fit: cover; display: none; }
+  #video.active, #preview-img.active { display: block; }
+  .cam-placeholder { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text3); }
+  .cam-placeholder-icon { font-size: 3rem; }
+  .cam-placeholder-text { font-size: 0.85rem; }
+  .cam-overlay { position: absolute; inset: 0; pointer-events: none; }
+  .face-guide {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -52%);
+    width: 42%; aspect-ratio: 3/4;
+    border: 2px dashed rgba(79,124,255,0.5); border-radius: 50%;
+  }
+  .guide-label {
+    position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);
+    font-size: 0.72rem; color: rgba(255,255,255,0.6); white-space: nowrap;
+    background: rgba(0,0,0,0.4); padding: 3px 10px; border-radius: 99px;
+  }
+  .method-tabs {
+    display: flex; gap: 4px; background: var(--bg3);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 4px; margin-bottom: 1.25rem;
+  }
+  .method-tab {
+    flex: 1; padding: 0.5rem; border-radius: 7px; text-align: center;
+    font-size: 0.83rem; font-weight: 500; cursor: pointer;
+    color: var(--text2); border: none; background: transparent;
+    font-family: inherit; transition: all 0.15s;
+  }
+  .method-tab.active { background: var(--bg2); color: var(--text); border: 1px solid var(--border2); }
+  .method-panel { display: none; }
+  .method-panel.active { display: block; }
+  .drop-zone {
+    border: 2px dashed var(--border2); border-radius: var(--radius-lg);
+    padding: 2.5rem 1rem; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(79,124,255,0.04); }
+  .drop-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .drop-text { font-size: 0.875rem; color: var(--text2); }
+  .drop-hint { font-size: 0.75rem; color: var(--text3); margin-top: 4px; }
+  #file-input { display: none; }
+  .tips {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem; margin-top: 1.25rem;
+  }
+  .tips-title { font-size: 0.78rem; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; }
+  .tips ul { padding-left: 1.1rem; display: flex; flex-direction: column; gap: 4px; }
+  .tips li { font-size: 0.8rem; color: var(--text3); line-height: 1.5; }
+  .status-banner { display: flex; align-items: center; gap: 10px; padding: 0.85rem 1rem; border-radius: var(--radius); font-size: 0.85rem; margin-bottom: 1.25rem; }
+  .status-banner.registered { background: var(--green-bg); border: 1px solid rgba(45,212,160,0.2); color: var(--green); }
+  .status-banner.not-registered { background: var(--amber-bg); border: 1px solid rgba(245,166,35,0.2); color: var(--amber); }
+  .btn-row { display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="brand">
+    <div class="brand-icon">🎓</div>
+    <div>
+      <div class="brand-name">AttendX</div>
+      <div class="brand-sub">Face Registration</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <a href="/dashboard/student" class="btn btn-ghost btn-sm">← Dashboard</a>
+  </div>
+</nav>
+
+<div class="face-wrap">
+
+  <div class="fade-up" style="margin-bottom:1.5rem">
+    <h1 class="page-title">Register your face</h1>
+    <p class="page-sub">Your face is used to verify your identity when marking attendance</p>
+  </div>
+
+  <div id="status-banner" class="status-banner not-registered fade-up">
+    <span id="status-icon">⚠️</span>
+    <span id="status-text">Face not registered yet</span>
+    <button id="remove-btn" class="btn btn-danger btn-sm" style="margin-left:auto;display:none" onclick="removeFace()">Remove</button>
+  </div>
+
+  <div id="alert" class="alert mb-1"></div>
+
+  <div class="method-tabs fade-up fade-up-1">
+    <button class="method-tab active" onclick="switchMethod('webcam')">📷 Use webcam</button>
+    <button class="method-tab" onclick="switchMethod('upload')">📁 Upload photo</button>
+  </div>
+
+  <!-- Webcam panel -->
+  <div id="panel-webcam" class="method-panel active fade-up fade-up-1">
+    <div class="cam-box">
+      <div class="cam-placeholder" id="cam-placeholder">
+        <div class="cam-placeholder-icon">📷</div>
+        <div class="cam-placeholder-text">Camera not started</div>
+      </div>
+      <video id="video" autoplay playsinline></video>
+      <img id="preview-img" alt="Captured face preview">
+      <div class="cam-overlay" id="cam-overlay" style="display:none">
+        <div class="face-guide"></div>
+        <div class="guide-label">Align your face inside the oval</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button id="start-cam-btn" class="btn btn-secondary" onclick="startCamera()">▶ Start camera</button>
+      <button id="capture-btn" class="btn btn-primary" style="display:none" onclick="capturePhoto()">📸 Capture photo</button>
+      <button id="retake-btn" class="btn btn-ghost" style="display:none" onclick="retakePhoto()">↺ Retake</button>
+      <button id="submit-webcam-btn" class="btn btn-primary" style="display:none" onclick="submitWebcam()">✓ Save face</button>
+    </div>
+  </div>
+
+  <!-- Upload panel -->
+  <div id="panel-upload" class="method-panel fade-up fade-up-1">
+    <div class="drop-zone" id="drop-zone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div id="drop-content">
+        <div class="drop-icon">🖼️</div>
+        <div class="drop-text">Click to choose a photo or drag & drop here</div>
+        <div class="drop-hint">JPEG, PNG or WEBP · max 5 MB</div>
+      </div>
+      <img id="upload-preview" style="display:none;width:100%;max-height:280px;object-fit:contain;border-radius:8px" alt="Upload preview">
+    </div>
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" onchange="onFileSelect(event)">
+    <div class="btn-row">
+      <button id="submit-upload-btn" class="btn btn-primary" style="display:none" onclick="submitUpload()">✓ Save face</button>
+      <button id="clear-upload-btn" class="btn btn-ghost" style="display:none" onclick="clearUpload()">✕ Clear</button>
+    </div>
+  </div>
+
+  <div class="tips fade-up fade-up-2">
+    <div class="tips-title">📌 Tips for a good photo</div>
+    <ul>
+      <li>Face the camera directly — avoid side angles</li>
+      <li>Good lighting — avoid backlighting or strong shadows</li>
+      <li>No sunglasses, masks, or hats covering your face</li>
+      <li>Only one person should be in the frame</li>
+      <li>Neutral expression is fine</li>
+    </ul>
+  </div>
+
+</div>
+
+<script src="/frontend/static/js/auth.js"></script>
+<script>
+  Auth.requireAuth('student');
+
+  let stream = null;
+  let capturedBlob = null;
+  let uploadFile = null;
+
+  async function loadStatus() {
+    const res = await Auth.fetch('/api/face/status');
+    if (!res) return;
+    const data = await res.json();
+    const banner    = document.getElementById('status-banner');
+    const icon      = document.getElementById('status-icon');
+    const text      = document.getElementById('status-text');
+    const removeBtn = document.getElementById('remove-btn');
+
+    if (data.has_face) {
+      banner.className = 'status-banner registered';
+      icon.textContent = '✓';
+      const date = data.updated_at ? new Date(data.updated_at).toLocaleDateString() : '';
+      text.textContent = `Face registered${date ? ' · updated ' + date : ''}`;
+      removeBtn.style.display = 'inline-flex';
+    } else {
+      banner.className = 'status-banner not-registered';
+      icon.textContent = '⚠️';
+      text.textContent = 'Face not registered yet';
+      removeBtn.style.display = 'none';
+    }
+  }
+
+  loadStatus();
+
+  function switchMethod(method) {
+    document.querySelectorAll('.method-tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && method === 'webcam') || (i === 1 && method === 'upload'));
+    });
+    document.getElementById('panel-webcam').classList.toggle('active', method === 'webcam');
+    document.getElementById('panel-upload').classList.toggle('active', method === 'upload');
+    hideAlert('alert');
+    if (method !== 'webcam') stopCamera();
+  }
+
+  async function startCamera() {
+    hideAlert('alert');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+      const video = document.getElementById('video');
+      video.srcObject = stream;
+      video.classList.add('active');
+      document.getElementById('cam-placeholder').style.display = 'none';
+      document.getElementById('cam-overlay').style.display = 'block';
+      document.getElementById('start-cam-btn').style.display = 'none';
+      document.getElementById('capture-btn').style.display = 'inline-flex';
+    } catch (err) {
+      showAlert('alert', 'Camera access denied. Please allow camera access and try again.', 'error');
+    }
+  }
+
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    const video = document.getElementById('video');
+    video.classList.remove('active');
+    video.srcObject = null;
+    document.getElementById('cam-overlay').style.display = 'none';
+    document.getElementById('cam-placeholder').style.display = 'flex';
+    document.getElementById('start-cam-btn').style.display = 'inline-flex';
+    document.getElementById('capture-btn').style.display = 'none';
+    document.getElementById('retake-btn').style.display = 'none';
+    document.getElementById('submit-webcam-btn').style.display = 'none';
+  }
+
+  function capturePhoto() {
+    const video = document.getElementById('video');
+    const canvas = document.createElement('canvas');
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      capturedBlob = blob;
+      const preview = document.getElementById('preview-img');
+      preview.src = URL.createObjectURL(blob);
+      preview.classList.add('active');
+      video.classList.remove('active');
+      document.getElementById('cam-overlay').style.display = 'none';
+      document.getElementById('capture-btn').style.display = 'none';
+      document.getElementById('retake-btn').style.display = 'inline-flex';
+      document.getElementById('submit-webcam-btn').style.display = 'inline-flex';
+      stopCamera();
+    }, 'image/jpeg', 0.92);
+  }
+
+  function retakePhoto() {
+    capturedBlob = null;
+    document.getElementById('preview-img').classList.remove('active');
+    document.getElementById('preview-img').src = '';
+    document.getElementById('retake-btn').style.display = 'none';
+    document.getElementById('submit-webcam-btn').style.display = 'none';
+    hideAlert('alert');
+    startCamera();
+  }
+
+  async function submitWebcam() {
+    if (!capturedBlob) return;
+    hideAlert('alert');
+    setLoading('submit-webcam-btn', true);
+    const formData = new FormData();
+    formData.append('file', capturedBlob, 'face.jpg');
+    const res = await fetch('/api/face/register', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${Auth.token}` },
+      body: formData,
+    });
+    const data = await res.json();
+    setLoading('submit-webcam-btn', false);
+    if (!res.ok) { showAlert('alert', data.detail || 'Registration failed.', 'error'); return; }
+    showAlert('alert', '✓ Face registered successfully!', 'success');
+    loadStatus();
+  }
+
+  function onFileSelect(e) { const f = e.target.files[0]; if (f) previewUpload(f); }
+  function onDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
+  function onDragLeave(e) { document.getElementById('drop-zone').classList.remove('drag-over'); }
+  function onDrop(e) { e.preventDefault(); document.getElementById('drop-zone').classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) previewUpload(f); }
+
+  function previewUpload(file) {
+    uploadFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById('upload-preview');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      document.getElementById('drop-content').style.display = 'none';
+      document.getElementById('submit-upload-btn').style.display = 'inline-flex';
+      document.getElementById('clear-upload-btn').style.display = 'inline-flex';
+    };
+    reader.readAsDataURL(file);
+    hideAlert('alert');
+  }
+
+  function clearUpload() {
+    uploadFile = null;
+    document.getElementById('upload-preview').style.display = 'none';
+    document.getElementById('upload-preview').src = '';
+    document.getElementById('drop-content').style.display = 'block';
+    document.getElementById('submit-upload-btn').style.display = 'none';
+    document.getElementById('clear-upload-btn').style.display = 'none';
+    document.getElementById('file-input').value = '';
+    hideAlert('alert');
+  }
+
+  async function submitUpload() {
+    if (!uploadFile) return;
+    hideAlert('alert');
+    setLoading('submit-upload-btn', true);
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+    const res = await fetch('/api/face/register', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${Auth.token}` },
+      body: formData,
+    });
+    const data = await res.json();
+    setLoading('submit-upload-btn', false);
+    if (!res.ok) { showAlert('alert', data.detail || 'Registration failed.', 'error'); return; }
+    showAlert('alert', '✓ Face registered successfully!', 'success');
+    clearUpload();
+    loadStatus();
+  }
+
+  async function removeFace() {
+    if (!confirm('Remove your face registration? You will need to re-register before marking attendance.')) return;
+    const res = await Auth.fetch('/api/face/register', { method: 'DELETE' });
+    if (res && res.ok) { showAlert('alert', 'Face registration removed.', 'success'); loadStatus(); }
+  }
+</script>
+</body>
+</html>

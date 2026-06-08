@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AttendX — Geo-Fenced Attendance System</title>
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+<style>
+  .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+  .hero-title { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 600; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 1rem; }
+  .hero-title span { background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero-sub { font-size: 1.05rem; color: var(--text2); max-width: 480px; margin: 0 auto 2.5rem; line-height: 1.65; }
+  .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .feature-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; max-width: 800px; margin: 4rem auto 0; }
+  .feature { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; text-align: left; }
+  .feature-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+  .feature-label { font-size: 0.875rem; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .feature-desc { font-size: 0.78rem; color: var(--text3); line-height: 1.55; }
+</style>
+</head>
+<body>
+<div class="hero fade-up">
+  <div class="brand" style="justify-content:center;margin-bottom:3rem">
+    <div class="brand-icon">🎓</div>
+    <div>
+      <div class="brand-name">AttendX</div>
+      <div class="brand-sub">Smart Attendance</div>
+    </div>
+  </div>
+
+  <h1 class="hero-title">Attendance that<br><span>can't be faked</span></h1>
+  <p class="hero-sub">Geo-fenced facial recognition for higher institutions. Face + GPS + liveness — all in one tap.</p>
+
+  <div class="hero-btns">
+    <a href="/login" class="btn btn-primary" style="font-size:0.95rem;padding:0.8rem 1.75rem">Sign in</a>
+    <a href="/register" class="btn btn-secondary" style="font-size:0.95rem;padding:0.8rem 1.75rem">Create account</a>
+  </div>
+
+  <div class="feature-row fade-up fade-up-2">
+    <div class="feature">
+      <div class="feature-icon">📍</div>
+      <div class="feature-label">GPS Geofencing</div>
+      <div class="feature-desc">50 m radius enforcement — must be physically in class</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">👤</div>
+      <div class="feature-label">Face Recognition</div>
+      <div class="feature-desc">Live webcam vs stored encoding — no proxies</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📱</div>
+      <div class="feature-label">Device Tracking</div>
+      <div class="feature-desc">One device per session — prevents sharing</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔲</div>
+      <div class="feature-label">QR Sessions</div>
+      <div class="feature-desc">Lecturer generates unique QR per class session</div>
+    </div>
+  </div>
+</div>
+<script src="/frontend/static/js/auth.js"></script>
+<script>Auth.redirectIfLoggedIn();</script>
+</body>
+</html>

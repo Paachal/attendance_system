@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register — AttendX</title>
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+<style>
+  .auth-wrap { max-width: 520px; }
+  .form-section { display: none; }
+  .form-section.active { display: contents; }
+</style>
+</head>
+<body>
+<div class="page-center">
+  <div class="auth-wrap fade-up">
+    <div class="brand">
+      <div class="brand-icon">🎓</div>
+      <div>
+        <div class="brand-name">AttendX</div>
+        <div class="brand-sub">Smart Attendance</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h1 class="page-title">Create account</h1>
+      <p class="page-sub">Register as a student or lecturer</p>
+
+      <div class="role-tabs">
+        <button class="role-tab active" onclick="setRole('student')">Student</button>
+        <button class="role-tab" onclick="setRole('lecturer')">Lecturer</button>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <form id="reg-form" class="form-grid" onsubmit="handleRegister(event)">
+
+        <!-- Shared fields -->
+        <div class="form-grid-2">
+          <div class="field">
+            <label for="full_name">Full name</label>
+            <input type="text" id="full_name" placeholder="Dr. Ada Okafor" required>
+          </div>
+          <div class="field">
+            <label for="email">Email address</label>
+            <input type="email" id="email" placeholder="you@university.edu" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="field">
+            <label for="department">Department</label>
+            <input type="text" id="department" placeholder="Computer Science" required>
+          </div>
+
+          <!-- Student-specific -->
+          <div class="field form-section" id="s-matric">
+            <label for="matric_number">Matric number</label>
+            <input type="text" id="matric_number" placeholder="CSC/2021/001">
+          </div>
+
+          <!-- Lecturer-specific -->
+          <div class="field form-section" id="l-staff">
+            <label for="staff_id">Staff ID</label>
+            <input type="text" id="staff_id" placeholder="STAFF/001">
+          </div>
+        </div>
+
+        <!-- Student level -->
+        <div class="field form-section" id="s-level">
+          <label for="level">Level</label>
+          <select id="level">
+            <option value="">Select level</option>
+            <option value="100">100 Level</option>
+            <option value="200">200 Level</option>
+            <option value="300">300 Level</option>
+            <option value="400">400 Level</option>
+            <option value="500">500 Level</option>
+          </select>
+        </div>
+
+        <!-- Lecturer title -->
+        <div class="field form-section" id="l-title">
+          <label for="title">Title</label>
+          <select id="title">
+            <option value="">Select title</option>
+            <option value="Mr.">Mr.</option>
+            <option value="Mrs.">Mrs.</option>
+            <option value="Ms.">Ms.</option>
+            <option value="Dr.">Dr.</option>
+            <option value="Prof.">Prof.</option>
+          </select>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="min. 6 characters" required autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="confirm_password">Confirm password</label>
+            <input type="password" id="confirm_password" placeholder="repeat password" required>
+          </div>
+        </div>
+
+        <button type="submit" id="reg-btn" class="btn btn-primary btn-full mt-1">Create account</button>
+      </form>
+
+      <div class="divider">or</div>
+      <p class="text-center text-sm text-muted">
+        Already have an account? <a href="/login">Sign in</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="/frontend/static/js/auth.js"></script>
+<script>
+  Auth.redirectIfLoggedIn();
+
+  let currentRole = 'student';
+
+  function setRole(role) {
+    currentRole = role;
+    document.querySelectorAll('.role-tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && role === 'student') || (i === 1 && role === 'lecturer'));
+    });
+
+    const studentFields   = ['s-matric', 's-level'];
+    const lecturerFields  = ['l-staff', 'l-title'];
+
+    studentFields.forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.toggle('active', role === 'student');
+      el.querySelectorAll('input,select').forEach(f => f.required = role === 'student');
+    });
+
+    lecturerFields.forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.toggle('active', role === 'lecturer');
+      el.querySelectorAll('input,select').forEach(f => f.required = role === 'lecturer');
+    });
+
+    hideAlert('alert');
+  }
+
+  // Init student fields as active
+  setRole('student');
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    hideAlert('alert');
+
+    const password = document.getElementById('password').value;
+    const confirm  = document.getElementById('confirm_password').value;
+    if (password !== confirm) {
+      showAlert('alert', 'Passwords do not match', 'error');
+      return;
+    }
+
+    setLoading('reg-btn', true);
+
+    let body;
+    if (currentRole === 'student') {
+      body = {
+        full_name:     document.getElementById('full_name').value.trim(),
+        email:         document.getElementById('email').value.trim(),
+        password,
+        matric_number: document.getElementById('matric_number').value.trim(),
+        department:    document.getElementById('department').value.trim(),
+        level:         document.getElementById('level').value,
+      };
+    } else {
+      body = {
+        full_name:  document.getElementById('full_name').value.trim(),
+        email:      document.getElementById('email').value.trim(),
+        password,
+        staff_id:   document.getElementById('staff_id').value.trim(),
+        department: document.getElementById('department').value.trim(),
+        title:      document.getElementById('title').value || null,
+      };
+    }
+
+    const { ok, data } = await apiPost(`/api/auth/${currentRole}/register`, body);
+    setLoading('reg-btn', false);
+
+    if (!ok) {
+      showAlert('alert', data.detail || 'Registration failed. Please try again.', 'error');
+      return;
+    }
+
+    showAlert('alert', 'Account created! Redirecting to login…', 'success');
+    setTimeout(() => window.location.href = '/login', 1500);
+  }
+</script>
+</body>
+</html>

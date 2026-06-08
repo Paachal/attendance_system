@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Courses — AttendX</title>
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+<style>
+  .course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+  .course-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 1.25rem 1.5rem;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .course-card:hover { border-color: var(--border2); }
+  .course-code { font-size: 0.75rem; font-weight: 500; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .course-title { font-size: 0.95rem; font-weight: 500; color: var(--text); margin-bottom: 8px; }
+  .course-meta { font-size: 0.78rem; color: var(--text3); display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200; padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: var(--radius-lg); padding: 1.75rem;
+    width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.25rem; }
+  .modal-footer { display: flex; gap: 10px; margin-top: 1.25rem; justify-content: flex-end; }
+
+  .empty-state { text-align: center; padding: 3rem 2rem; color: var(--text3); }
+  .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="brand">
+    <div class="brand-icon">🎓</div>
+    <div>
+      <div class="brand-name">AttendX</div>
+      <div class="brand-sub">Courses</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <a href="/dashboard/lecturer" class="btn btn-ghost btn-sm">← Dashboard</a>
+    <button class="btn btn-primary btn-sm" onclick="openModal('create-modal')">+ New course</button>
+  </div>
+</nav>
+
+<div class="dashboard-wrap">
+
+  <div class="fade-up" style="margin-bottom:1.5rem">
+    <h1 class="page-title">My courses</h1>
+    <p class="page-sub">Create courses and manage attendance sessions</p>
+  </div>
+
+  <div id="alert" class="alert mb-1"></div>
+
+  <div id="course-grid" class="course-grid fade-up">
+    <div class="empty-state" id="empty-state" style="display:none">
+      <div class="empty-icon">📚</div>
+      <div class="section-title mb-1">No courses yet</div>
+      <p class="text-sm text-muted mb-1">Create your first course to get started</p>
+      <button class="btn btn-primary btn-sm" onclick="openModal('create-modal')">+ Create course</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Create Course Modal -->
+<div class="modal-overlay" id="create-modal" onclick="handleOverlayClick(event,'create-modal')">
+  <div class="modal">
+    <div class="modal-title">Create new course</div>
+    <div id="create-alert" class="alert mb-1"></div>
+    <div class="form-grid">
+      <div class="form-grid-2">
+        <div class="field">
+          <label>Course code</label>
+          <input type="text" id="c-code" placeholder="CSC301" required>
+        </div>
+        <div class="field">
+          <label>Units</label>
+          <input type="number" id="c-units" min="1" max="6" value="3">
+        </div>
+      </div>
+      <div class="field">
+        <label>Course title</label>
+        <input type="text" id="c-title" placeholder="Data Structures and Algorithms" required>
+      </div>
+      <div class="field">
+        <label>Department</label>
+        <input type="text" id="c-dept" placeholder="Computer Science" required>
+      </div>
+      <div class="form-grid-2">
+        <div class="field">
+          <label>Level</label>
+          <select id="c-level">
+            <option value="100">100 Level</option>
+            <option value="200">200 Level</option>
+            <option value="300" selected>300 Level</option>
+            <option value="400">400 Level</option>
+            <option value="500">500 Level</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Semester</label>
+          <select id="c-semester">
+            <option value="first">First</option>
+            <option value="second">Second</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('create-modal')">Cancel</button>
+      <button class="btn btn-primary" id="create-btn" onclick="createCourse()">Create course</button>
+    </div>
+  </div>
+</div>
+
+<!-- Open Session Modal -->
+<div class="modal-overlay" id="session-modal" onclick="handleOverlayClick(event,'session-modal')">
+  <div class="modal">
+    <div class="modal-title">Open attendance session</div>
+    <div id="session-alert" class="alert mb-1"></div>
+    <p class="text-sm text-muted mb-1" id="session-course-name"></p>
+    <div class="form-grid">
+      <div class="field">
+        <label>Classroom GPS — latitude</label>
+        <input type="number" id="s-lat" step="any" placeholder="5.0389">
+        <span class="text-xs text-muted mt-1" style="margin-top:4px">
+          <a href="#" onclick="useMyLocation(event)" style="color:var(--accent)">📍 Use my current location</a>
+        </span>
+      </div>
+      <div class="field">
+        <label>Classroom GPS — longitude</label>
+        <input type="number" id="s-lng" step="any" placeholder="7.9121">
+      </div>
+      <div class="form-grid-2">
+        <div class="field">
+          <label>Allowed radius (meters)</label>
+          <input type="number" id="s-radius" value="50" min="10" max="500">
+        </div>
+        <div class="field">
+          <label>Session duration (minutes)</label>
+          <input type="number" id="s-duration" value="60" min="5" max="300">
+        </div>
+      </div>
+      <div class="field">
+        <label>Notes (optional)</label>
+        <input type="text" id="s-notes" placeholder="e.g. Room LT1, Block A">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('session-modal')">Cancel</button>
+      <button class="btn btn-primary" id="session-btn" onclick="openSession()">Open session & generate QR</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Display Modal -->
+<div class="modal-overlay" id="qr-modal" onclick="handleOverlayClick(event,'qr-modal')">
+  <div class="modal" style="text-align:center">
+    <div class="modal-title">Session QR code</div>
+    <p class="text-sm text-muted mb-1" id="qr-course-name"></p>
+    <div style="background:#fff;border-radius:12px;padding:1rem;display:inline-block;margin:1rem 0">
+      <img id="qr-image" style="width:220px;height:220px" alt="QR code">
+    </div>
+    <div style="margin-bottom:1rem">
+      <div class="text-xs text-muted">Session expires at</div>
+      <div id="qr-expires" style="font-size:0.9rem;font-weight:500;color:var(--text)"></div>
+      <div id="qr-countdown" style="font-size:0.8rem;color:var(--amber);margin-top:4px"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('qr-modal')">Close</button>
+      <button class="btn btn-danger btn-sm" id="close-session-btn" onclick="closeActiveSession()">Close session</button>
+    </div>
+  </div>
+</div>
+
+<script src="/frontend/static/js/auth.js"></script>
+<script>
+  Auth.requireAuth('lecturer');
+
+  let selectedCourseId = null;
+  let activeSessionId  = null;
+  let countdownTimer   = null;
+
+  // ── Load courses ────────────────────────────────────────────────────────────
+
+  async function loadCourses() {
+    const res = await Auth.fetch('/api/courses/my');
+    if (!res) return;
+    const courses = await res.json();
+    const grid = document.getElementById('course-grid');
+
+    // Remove old cards (keep empty state)
+    grid.querySelectorAll('.course-card').forEach(c => c.remove());
+
+    if (courses.length === 0) {
+      document.getElementById('empty-state').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('empty-state').style.display = 'none';
+
+    courses.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'course-card';
+      card.innerHTML = `
+        <div class="course-code">${c.course_code}</div>
+        <div class="course-title">${c.course_title}</div>
+        <div class="course-meta">
+          <span>${c.department}</span>
+          <span>${c.level} Level</span>
+          <span>${c.semester} semester</span>
+          <span>${c.units} units</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();startSession('${c.id}','${c.course_code} — ${c.course_title}')">▶ Open session</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteCourse('${c.id}')">🗑 Delete</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  loadCourses();
+
+  // ── Create course ───────────────────────────────────────────────────────────
+
+  async function createCourse() {
+    hideAlert('create-alert');
+    setLoading('create-btn', true);
+
+    const body = {
+      course_code:  document.getElementById('c-code').value.trim(),
+      course_title: document.getElementById('c-title').value.trim(),
+      department:   document.getElementById('c-dept').value.trim(),
+      level:        document.getElementById('c-level').value,
+      semester:     document.getElementById('c-semester').value,
+      units:        parseInt(document.getElementById('c-units').value),
+    };
+
+    const res = await Auth.fetch('/api/courses/', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    setLoading('create-btn', false);
+
+    if (!res.ok) { showAlert('create-alert', data.detail || 'Failed to create course', 'error'); return; }
+
+    closeModal('create-modal');
+    loadCourses();
+  }
+
+  // ── Delete course ───────────────────────────────────────────────────────────
+
+  async function deleteCourse(courseId) {
+    if (!confirm('Delete this course? All sessions will remain in the database.')) return;
+    const res = await Auth.fetch(`/api/courses/${courseId}`, { method: 'DELETE' });
+    if (res && res.ok) loadCourses();
+  }
+
+  // ── Open session ────────────────────────────────────────────────────────────
+
+  function startSession(courseId, courseName) {
+    selectedCourseId = courseId;
+    document.getElementById('session-course-name').textContent = courseName;
+    hideAlert('session-alert');
+    openModal('session-modal');
+  }
+
+  function useMyLocation(e) {
+    e.preventDefault();
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById('s-lat').value = pos.coords.latitude.toFixed(6);
+      document.getElementById('s-lng').value = pos.coords.longitude.toFixed(6);
+    }, () => alert('Could not get location. Enter coordinates manually.'));
+  }
+
+  async function openSession() {
+    hideAlert('session-alert');
+    setLoading('session-btn', true);
+
+    const body = {
+      course_id:        selectedCourseId,
+      latitude:         parseFloat(document.getElementById('s-lat').value),
+      longitude:        parseFloat(document.getElementById('s-lng').value),
+      radius_meters:    parseFloat(document.getElementById('s-radius').value),
+      duration_minutes: parseInt(document.getElementById('s-duration').value),
+      notes:            document.getElementById('s-notes').value.trim() || null,
+    };
+
+    if (isNaN(body.latitude) || isNaN(body.longitude)) {
+      showAlert('session-alert', 'Please enter valid GPS coordinates or use your current location.', 'error');
+      setLoading('session-btn', false);
+      return;
+    }
+
+    const res = await Auth.fetch(`/api/courses/${selectedCourseId}/sessions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    setLoading('session-btn', false);
+
+    if (!res.ok) { showAlert('session-alert', data.detail || 'Failed to open session', 'error'); return; }
+
+    closeModal('session-modal');
+    showQR(data);
+  }
+
+  function showQR(data) {
+    activeSessionId = data.session_id;
+    document.getElementById('qr-image').src = `data:image/png;base64,${data.qr_image}`;
+    document.getElementById('qr-course-name').textContent = document.getElementById('session-course-name').textContent;
+    document.getElementById('qr-expires').textContent = new Date(data.expires_at).toLocaleTimeString();
+    openModal('qr-modal');
+    startCountdown(new Date(data.expires_at));
+  }
+
+  function startCountdown(expiresAt) {
+    if (countdownTimer) clearInterval(countdownTimer);
+    function update() {
+      const diff = Math.max(0, expiresAt - new Date());
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      document.getElementById('qr-countdown').textContent =
+        diff > 0 ? `Closes in ${mins}m ${secs}s` : 'Session expired';
+      if (diff === 0) clearInterval(countdownTimer);
+    }
+    update();
+    countdownTimer = setInterval(update, 1000);
+  }
+
+  async function closeActiveSession() {
+    if (!activeSessionId) return;
+    if (!confirm('Close this attendance session?')) return;
+    const res = await Auth.fetch(`/api/courses/sessions/${activeSessionId}/close`, { method: 'PATCH' });
+    if (res && res.ok) {
+      closeModal('qr-modal');
+      if (countdownTimer) clearInterval(countdownTimer);
+      activeSessionId = null;
+    }
+  }
+
+  // ── Modal helpers ───────────────────────────────────────────────────────────
+
+  function openModal(id)  { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  function handleOverlayClick(e, id) { if (e.target.id === id) closeModal(id); }
+</script>
+</body>
+</html>

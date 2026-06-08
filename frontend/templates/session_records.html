@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Records — AttendX</title>
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+<style>
+  .present-badge {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid rgba(45,212,160,0.2);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .export-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="brand">
+    <div class="brand-icon">🎓</div>
+    <div>
+      <div class="brand-name">AttendX</div>
+      <div class="brand-sub">Session Records</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <a href="/dashboard/lecturer" class="btn btn-ghost btn-sm">← Dashboard</a>
+  </div>
+</nav>
+
+<div class="dashboard-wrap">
+
+  <div class="fade-up" style="margin-bottom:1.5rem">
+    <h1 class="page-title" id="session-title">Attendance Records</h1>
+    <p class="page-sub" id="session-meta">Loading session info…</p>
+  </div>
+
+  <div id="alert" class="alert mb-1"></div>
+
+  <!-- Stats -->
+  <div class="stats-grid fade-up fade-up-1" style="margin-bottom:1.5rem">
+    <div class="stat-card">
+      <div class="stat-label">Present</div>
+      <div class="stat-value" id="stat-present" style="color:var(--green)">—</div>
+      <div class="stat-hint">students marked</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Session status</div>
+      <div class="stat-value" id="stat-status" style="font-size:1rem">—</div>
+      <div class="stat-hint" id="stat-expires">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg face confidence</div>
+      <div class="stat-value" id="stat-confidence">—</div>
+      <div class="stat-hint">verification score</div>
+    </div>
+  </div>
+
+  <!-- Export + refresh bar -->
+  <div class="export-bar fade-up fade-up-1">
+    <div class="section-title">Students present</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="loadRecords()">↺ Refresh</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Records table -->
+  <div class="table-wrap fade-up fade-up-2" id="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Student name</th>
+          <th>Matric number</th>
+          <th>Time marked</th>
+          <th>Distance</th>
+          <th>Face confidence</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="records-body">
+        <tr>
+          <td colspan="7" style="text-align:center;padding:2rem;color:var(--text3)">
+            Loading records…
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Device logs tab -->
+  <div style="margin-top:2rem" class="fade-up fade-up-3">
+    <div class="export-bar">
+      <div class="section-title">Device logs</div>
+      <button class="btn btn-ghost btn-sm" onclick="loadDeviceLogs()">↺ Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Device ID</th>
+            <th>Student ID</th>
+            <th>Time</th>
+            <th>Flag</th>
+          </tr>
+        </thead>
+        <tbody id="device-body">
+          <tr>
+            <td colspan="4" style="text-align:center;padding:1.5rem;color:var(--text3)">
+              Click refresh to load device logs
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="/frontend/static/js/auth.js"></script>
+<script>
+  Auth.requireAuth('lecturer');
+
+  const params    = new URLSearchParams(window.location.search);
+  const sessionId = params.get('session_id');
+  let allRecords  = [];
+
+  if (!sessionId) {
+    showAlert('alert', 'No session ID provided.', 'error');
+  } else {
+    loadSession();
+    loadRecords();
+    // Auto-refresh every 15 seconds if session is active
+    setInterval(() => loadRecords(), 15000);
+  }
+
+  async function loadSession() {
+    // Try to get session info from active sessions
+    const res = await Auth.fetch('/api/courses/sessions/active');
+    if (!res || !res.ok) return;
+    const sessions = await res.json();
+    const session  = sessions.find(s => s.id === sessionId);
+
+    if (session) {
+      document.getElementById('session-title').textContent =
+        `${session.course_code} — ${session.course_title}`;
+      document.getElementById('session-meta').textContent =
+        `${session.notes || 'No notes'} · Radius: ${session.radius_meters}m · ` +
+        `Started: ${new Date(session.started_at).toLocaleTimeString()}`;
+      document.getElementById('stat-status').textContent = 'Active';
+      document.getElementById('stat-status').style.color = 'var(--green)';
+      document.getElementById('stat-expires').textContent =
+        `Expires: ${new Date(session.expires_at).toLocaleTimeString()}`;
+    }
+  }
+
+  async function loadRecords() {
+    const res = await Auth.fetch(`/api/attendance/session/${sessionId}`);
+    if (!res || !res.ok) return;
+    const records = await res.json();
+    allRecords = records;
+
+    document.getElementById('stat-present').textContent = records.length;
+
+    if (records.length > 0) {
+      const avgConf = records.reduce((sum, r) => sum + (r.face_confidence || 0), 0) / records.length;
+      document.getElementById('stat-confidence').textContent = avgConf.toFixed(1) + '%';
+    } else {
+      document.getElementById('stat-confidence').textContent = '—';
+    }
+
+    const tbody = document.getElementById('records-body');
+
+    if (records.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align:center;padding:2.5rem;color:var(--text3)">
+            No students have marked attendance yet
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = records.map((r, i) => `
+      <tr>
+        <td style="color:var(--text3)">${i + 1}</td>
+        <td style="color:var(--text);font-weight:500">${r.student_name || '—'}</td>
+        <td class="mono">${r.matric_number || '—'}</td>
+        <td>${new Date(r.marked_at).toLocaleTimeString()}</td>
+        <td>${r.distance_m ? r.distance_m.toFixed(1) + 'm' : '—'}</td>
+        <td>${r.face_confidence ? r.face_confidence + '%' : '—'}</td>
+        <td><span class="present-badge">✓ Present</span></td>
+      </tr>
+    `).join('');
+  }
+
+  function exportCSV() {
+    if (allRecords.length === 0) {
+      showAlert('alert', 'No records to export.', 'error');
+      return;
+    }
+
+    const title  = document.getElementById('session-title').textContent;
+    const header = ['#', 'Student Name', 'Matric Number', 'Course', 'Time Marked', 'Distance (m)', 'Face Confidence (%)'];
+    const rows   = allRecords.map((r, i) => [
+      i + 1,
+      r.student_name || '',
+      r.matric_number || '',
+      r.course_code || '',
+      new Date(r.marked_at).toLocaleString(),
+      r.distance_m ? r.distance_m.toFixed(1) : '',
+      r.face_confidence || '',
+    ]);
+
+    const csv = [header, ...rows].map(row =>
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `attendance_${title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadDeviceLogs() {
+    const res = await Auth.fetch(`/api/devices/session/${sessionId}`);
+    if (!res || !res.ok) return;
+    const logs = await res.json();
+    const tbody = document.getElementById('device-body');
+
+    if (logs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:var(--text3)">No device logs</td></tr>`;
+      return;
+    }
+
+    // Find duplicate device IDs (potential cheating)
+    const deviceCounts = {};
+    logs.forEach(l => {
+      deviceCounts[l.device_id] = (deviceCounts[l.device_id] || 0) + 1;
+    });
+
+    tbody.innerHTML = logs.map(l => {
+      const flagged = deviceCounts[l.device_id] > 1;
+      return `
+        <tr>
+          <td class="mono" style="font-size:0.75rem">${l.device_id?.slice(0,16)}…</td>
+          <td class="mono" style="font-size:0.75rem">${l.student_id?.slice(0,16)}…</td>
+          <td>${new Date(l.marked_at).toLocaleTimeString()}</td>
+          <td>${flagged
+            ? '<span class="badge badge-red">⚠ Duplicate device</span>'
+            : '<span class="badge badge-green">✓ Clean</span>'
+          }</td>
+        </tr>
+      `;
+    }).join('');
+  }
+  
+</script>
+</body>
+</html>

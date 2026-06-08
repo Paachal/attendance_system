@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — AttendX</title>
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+</head>
+<body>
+<div class="page-center">
+  <div class="auth-wrap fade-up">
+    <div class="brand">
+      <div class="brand-icon">🎓</div>
+      <div>
+        <div class="brand-name">AttendX</div>
+        <div class="brand-sub">Smart Attendance</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h1 class="page-title">Welcome back</h1>
+      <p class="page-sub">Sign in to your account</p>
+
+      <div class="role-tabs">
+        <button class="role-tab active" onclick="setRole('student')">Student</button>
+        <button class="role-tab" onclick="setRole('lecturer')">Lecturer</button>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <form id="login-form" class="form-grid" onsubmit="handleLogin(event)">
+        <div class="field">
+          <label for="email">Email address</label>
+          <input type="email" id="email" placeholder="you@university.edu" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="login-btn" class="btn btn-primary btn-full mt-1">Sign in</button>
+      </form>
+
+      <div class="divider">or</div>
+      <p class="text-center text-sm text-muted">
+        Don't have an account? <a href="/register">Create one</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="/frontend/static/js/auth.js"></script>
+<script>
+  Auth.redirectIfLoggedIn();
+
+  let currentRole = 'student';
+
+  function setRole(role) {
+    currentRole = role;
+    document.querySelectorAll('.role-tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && role === 'student') || (i === 1 && role === 'lecturer'));
+    });
+    hideAlert('alert');
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    hideAlert('alert');
+    setLoading('login-btn', true);
+
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    const { ok, data } = await apiPost(`/api/auth/${currentRole}/login`, { email, password });
+    setLoading('login-btn', false);
+
+    if (!ok) {
+      showAlert('alert', data.detail || 'Login failed. Check your credentials.', 'error');
+      return;
+    }
+
+    Auth.save(data);
+    window.location.href = currentRole === 'lecturer' ? '/dashboard/lecturer' : '/dashboard/student';
+  }
+</script>
+</body>
+</html>
