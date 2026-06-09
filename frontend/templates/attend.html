@@ -33,9 +33,17 @@
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 1rem;
   }
-  #video, #snap-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
+
+  #video, #snap-preview {
+    width: 100%; height: 100%; object-fit: cover; display: none;
+  }
+  #video { transform: scaleX(-1); }
   #video.active, #snap-preview.active { display: block; }
-  .cam-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text3); }
+
+  .cam-placeholder {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px; color: var(--text3);
+  }
   .face-guide {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -52%);
@@ -43,11 +51,14 @@
     border: 2px dashed rgba(79,124,255,0.5); border-radius: 50%;
     pointer-events: none;
   }
-  #cam-overlay { position: absolute; inset: 0; pointer-events: none; display: none; }
+  #cam-overlay {
+    position: absolute; inset: 0; pointer-events: none; display: none;
+  }
   .guide-label {
     position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);
     font-size: 0.72rem; color: rgba(255,255,255,0.6);
-    background: rgba(0,0,0,0.4); padding: 3px 10px; border-radius: 99px; white-space: nowrap;
+    background: rgba(0,0,0,0.4); padding: 3px 10px;
+    border-radius: 99px; white-space: nowrap;
   }
 
   .session-info {
@@ -58,10 +69,13 @@
   .session-info-title { font-weight: 500; color: var(--text); margin-bottom: 3px; }
   .session-info-meta { color: var(--text3); font-size: 0.78rem; }
 
-  .result-card { border-radius: var(--radius-lg); padding: 1.5rem; margin-top: 1rem; display: none; }
+  .result-card {
+    border-radius: var(--radius-lg); padding: 1.5rem;
+    margin-top: 1rem; display: none;
+  }
   .result-card.show { display: block; }
   .result-card.pass { background: var(--green-bg); border: 1px solid rgba(45,212,160,0.25); }
-  .result-card.fail { background: var(--red-bg);   border: 1px solid rgba(255,92,106,0.25); }
+  .result-card.fail { background: var(--red-bg); border: 1px solid rgba(255,92,106,0.25); }
   .result-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
   .result-card.pass .result-title { color: var(--green); }
   .result-card.fail .result-title { color: var(--red); }
@@ -69,6 +83,43 @@
   .result-meta { font-size: 0.78rem; color: var(--text3); margin-top: 8px; }
 
   .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }
+
+  /* QR scan styles */
+  .method-tabs {
+    display: flex; gap: 4px; background: var(--bg3);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 4px; margin-bottom: 1.25rem;
+  }
+  .method-tab {
+    flex: 1; padding: 0.5rem; border-radius: 7px; text-align: center;
+    font-size: 0.83rem; font-weight: 500; cursor: pointer;
+    color: var(--text2); border: none; background: transparent;
+    font-family: inherit; transition: all 0.15s;
+  }
+  .method-tab.active {
+    background: var(--bg2); color: var(--text);
+    border: 1px solid var(--border2);
+  }
+
+  .scan-box {
+    position: relative; width: 100%; aspect-ratio: 1;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius-lg); overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+  }
+  #scan-video {
+    display: none; width: 100%; height: 100%; object-fit: cover;
+  }
+  .scan-guide {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%; aspect-ratio: 1;
+    border: 2px solid rgba(79,124,255,0.7);
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
@@ -95,20 +146,12 @@
 
   <div id="alert" class="alert mb-1"></div>
 
-  <!-- Manual token entry (when no token in URL) -->
-  <!-- Manual token entry + QR scan (when no token in URL) -->
+  <!-- Token entry (when no token in URL) -->
   <div id="token-entry" class="card fade-up" style="display:none;margin-bottom:1rem">
 
-    <!-- Method tabs -->
-    <div style="display:flex;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:4px;margin-bottom:1.25rem">
-      <button id="tab-scan" onclick="switchTab('scan')"
-        style="flex:1;padding:0.5rem;border-radius:7px;font-size:0.83rem;font-weight:500;cursor:pointer;background:var(--bg2);color:var(--text);border:1px solid var(--border2);font-family:inherit">
-        📷 Scan QR code
-      </button>
-      <button id="tab-manual" onclick="switchTab('manual')"
-        style="flex:1;padding:0.5rem;border-radius:7px;font-size:0.83rem;font-weight:500;cursor:pointer;background:transparent;color:var(--text2);border:none;font-family:inherit">
-        ⌨️ Enter token
-      </button>
+    <div class="method-tabs">
+      <button id="tab-scan" class="method-tab active" onclick="switchTab('scan')">📷 Scan QR code</button>
+      <button id="tab-manual" class="method-tab" onclick="switchTab('manual')">⌨️ Enter token</button>
     </div>
 
     <!-- QR scan panel -->
@@ -116,22 +159,19 @@
       <p class="text-sm text-muted" style="margin-bottom:1rem">
         Point your camera at the lecturer's QR code.
       </p>
-      <div style="position:relative;width:100%;aspect-ratio:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-lg);overflow:hidden;display:flex;align-items:center;justify-content:center" id="scan-box">
+      <div class="scan-box" id="scan-box">
         <div id="scan-placeholder" style="text-align:center;color:var(--text3)">
           <div style="font-size:3rem;margin-bottom:0.5rem">📷</div>
           <div style="font-size:0.82rem">Camera not started</div>
         </div>
-        <video id="scan-video" style="display:none;width:100%;height:100%;object-fit:cover" autoplay playsinline></video>
-        <!-- Scan guide overlay -->
-        <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center" id="scan-overlay" style="display:none">
-          <div style="width:60%;aspect-ratio:1;border:2px solid rgba(79,124,255,0.7);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.4)"></div>
-        </div>
+        <video id="scan-video" autoplay playsinline></video>
+        <div class="scan-guide" id="scan-guide" style="display:none"></div>
         <canvas id="scan-canvas" style="display:none"></canvas>
       </div>
-      <div id="scan-status" style="font-size:0.8rem;color:var(--text3);text-align:center;margin-top:8px">
+      <div id="scan-status" style="font-size:0.8rem;color:var(--text3);text-align:center;margin-bottom:1rem">
         Press start to begin scanning
       </div>
-      <div style="display:flex;gap:10px;margin-top:1rem">
+      <div style="display:flex;gap:10px">
         <button id="start-scan-btn" class="btn btn-primary btn-full" onclick="startQRScan()">▶ Start camera</button>
         <button id="stop-scan-btn" class="btn btn-ghost" onclick="stopQRScan()" style="display:none">✕ Stop</button>
       </div>
@@ -144,7 +184,9 @@
       </p>
       <div class="field" style="margin-bottom:1rem">
         <label>Session token</label>
-        <input type="text" id="token-input" placeholder="e.g. 6a26e7d2...ab3f" style="font-family:monospace">
+        <input type="text" id="token-input"
+          placeholder="e.g. 6a26e7d2...ab3f"
+          style="font-family:monospace">
       </div>
       <button class="btn btn-primary btn-full" onclick="submitToken()">Continue →</button>
     </div>
@@ -159,7 +201,6 @@
 
   <!-- Verification steps -->
   <div class="steps fade-up fade-up-1" id="steps-wrap" style="display:none">
-
     <div class="step" id="step-session">
       <div class="step-icon">🔲</div>
       <div class="step-body">
@@ -187,15 +228,6 @@
       <div class="step-status" id="step-geofence-status">⏳</div>
     </div>
 
-    <div class="step" id="step-face">
-      <div class="step-icon">👤</div>
-      <div class="step-body">
-        <div class="step-label">Face verification</div>
-        <div class="step-detail" id="step-face-detail">Waiting…</div>
-      </div>
-      <div class="step-status" id="step-face-status">⏳</div>
-    </div>
-
     <div class="step" id="step-liveness">
       <div class="step-icon">🧬</div>
       <div class="step-body">
@@ -205,6 +237,14 @@
       <div class="step-status" id="step-liveness-status">⏳</div>
     </div>
 
+    <div class="step" id="step-face">
+      <div class="step-icon">👤</div>
+      <div class="step-body">
+        <div class="step-label">Face verification</div>
+        <div class="step-detail" id="step-face-detail">Waiting…</div>
+      </div>
+      <div class="step-status" id="step-face-status">⏳</div>
+    </div>
   </div>
 
   <!-- Webcam for face capture -->
@@ -223,10 +263,12 @@
     </div>
 
     <div class="btn-row">
-      <button id="capture-btn" class="btn btn-primary" onclick="captureAndSubmit()" style="display:none">
+      <button id="capture-btn" class="btn btn-primary"
+        onclick="captureAndSubmit()" style="display:none">
         📸 Capture & mark attendance
       </button>
-      <button id="retake-btn" class="btn btn-ghost" onclick="retake()" style="display:none">
+      <button id="retake-btn" class="btn btn-ghost"
+        onclick="retake()" style="display:none">
         ↺ Retake
       </button>
     </div>
@@ -245,12 +287,13 @@
 <script>
   Auth.requireAuth('student');
 
-  let qrToken       = null;
-  let sessionData   = null;
-  let studentCoords = null;
-  let stream        = null;
-  let capturedB64   = null;
-  let geoCheckPassed = false;
+  let qrToken        = null;
+  let sessionData    = null;
+  let studentCoords  = null;
+  let stream         = null;
+  let capturedB64    = null;
+  let scanStream     = null;
+  let scanInterval   = null;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -258,20 +301,107 @@
   qrToken = params.get('token');
 
   if (!qrToken) {
-    // Show manual token entry form
-    document.getElementById('page-sub').textContent = 'Enter the session token from your lecturer';
+    document.getElementById('page-sub').textContent =
+      'Scan the QR code or enter the session token';
     document.getElementById('token-entry').style.display = 'block';
   } else {
     loadSession();
   }
 
+  // ── Tab switching ─────────────────────────────────────────────────────────
 
+  function switchTab(tab) {
+    const isScan = tab === 'scan';
+    document.getElementById('panel-scan').style.display   = isScan ? 'block' : 'none';
+    document.getElementById('panel-manual').style.display = isScan ? 'none'  : 'block';
 
+    document.getElementById('tab-scan').className =
+      'method-tab' + (isScan ? ' active' : '');
+    document.getElementById('tab-manual').className =
+      'method-tab' + (!isScan ? ' active' : '');
 
-  // ── Load and validate session ─────────────────────────────────────────────
+    if (!isScan) stopQRScan();
+  }
+
+  // ── QR scan ───────────────────────────────────────────────────────────────
+
+  async function startQRScan() {
+    document.getElementById('scan-status').textContent = 'Starting camera…';
+    try {
+      scanStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      const video = document.getElementById('scan-video');
+      video.srcObject = scanStream;
+      video.style.display = 'block';
+      document.getElementById('scan-placeholder').style.display = 'none';
+      document.getElementById('scan-guide').style.display = 'block';
+      document.getElementById('start-scan-btn').style.display = 'none';
+      document.getElementById('stop-scan-btn').style.display  = 'inline-flex';
+      document.getElementById('scan-status').textContent =
+        'Scanning… point at QR code';
+
+      scanInterval = setInterval(() => scanFrame(video), 300);
+
+    } catch (err) {
+      document.getElementById('scan-status').textContent =
+        'Camera denied — use manual entry tab';
+      switchTab('manual');
+    }
+  }
+
+  function stopQRScan() {
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (scanStream)   {
+      scanStream.getTracks().forEach(t => t.stop());
+      scanStream = null;
+    }
+    const video = document.getElementById('scan-video');
+    if (video) { video.style.display = 'none'; video.srcObject = null; }
+    document.getElementById('scan-placeholder').style.display = 'flex';
+    document.getElementById('scan-guide').style.display = 'none';
+    document.getElementById('start-scan-btn').style.display = 'block';
+    document.getElementById('stop-scan-btn').style.display  = 'none';
+  }
+
+  function scanFrame(video) {
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    const canvas = document.getElementById('scan-canvas');
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const imageData = canvas.getContext('2d').getImageData(
+      0, 0, canvas.width, canvas.height
+    );
+    if (typeof jsQR === 'undefined') return;
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: 'dontInvert',
+    });
+    if (code && code.data) {
+      document.getElementById('scan-status').textContent = '✅ QR detected!';
+      stopQRScan();
+      let token = code.data;
+      if (token.includes('?token=')) token = token.split('?token=')[1];
+      qrToken = token;
+      document.getElementById('token-entry').style.display = 'none';
+      loadSession();
+    }
+  }
+
+  function submitToken() {
+    const val = document.getElementById('token-input').value.trim();
+    if (!val) { showAlert('alert', 'Please enter a token', 'error'); return; }
+    qrToken = val;
+    document.getElementById('token-entry').style.display = 'none';
+    loadSession();
+  }
+
+  // ── Load session ──────────────────────────────────────────────────────────
 
   async function loadSession() {
-    const res = await Auth.fetch(`/api/courses/sessions/by-token/${qrToken}`);
+    const res = await Auth.fetch(
+      `/api/courses/sessions/by-token/${qrToken}`
+    );
     if (!res) return;
     const data = await res.json();
 
@@ -283,15 +413,18 @@
     sessionData = data;
 
     document.getElementById('session-info').style.display = 'block';
-    document.getElementById('info-course').textContent = `${data.course_code} — ${data.course_title}`;
+    document.getElementById('info-course').textContent =
+      `${data.course_code} — ${data.course_title}`;
     document.getElementById('info-meta').textContent =
       `Active · expires ${new Date(data.expires_at).toLocaleTimeString()} · ${data.radius_meters}m radius`;
-    document.getElementById('page-sub').textContent = 'Complete all checks to mark your attendance';
+    document.getElementById('page-sub').textContent =
+      'Complete all checks to mark your attendance';
     document.getElementById('steps-wrap').style.display = 'flex';
 
     if (data.status !== 'active') {
       setStep('step-session', 'fail', `Session is ${data.status}`);
-      showAlert('alert', `Session is ${data.status}. Cannot mark attendance.`, 'error');
+      showAlert('alert',
+        `Session is ${data.status}. Cannot mark attendance.`, 'error');
       return;
     }
 
@@ -309,13 +442,21 @@
     }
     navigator.geolocation.getCurrentPosition(
       pos => {
-        studentCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        studentCoords = {
+          latitude:  pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
         setStep('step-gps', 'pass',
-          `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+          `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`
+        );
         checkGeofence();
       },
       err => {
-        const msgs = { 1: 'Permission denied', 2: 'Location unavailable', 3: 'Timed out' };
+        const msgs = {
+          1: 'Permission denied — please allow location access',
+          2: 'Location unavailable — try again',
+          3: 'Location timed out — try again',
+        };
         setStep('step-gps', 'fail', msgs[err.code] || 'Location error');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -338,37 +479,48 @@
     const data = await res.json();
 
     if (!res.ok || !data.inside) {
-      setStep('step-geofence', 'fail', data.message || data.detail || 'Outside zone');
-      setStep('step-face', 'fail', 'Skipped — location check failed');
-      showResult(false, '✗ Outside classroom zone', data.message || data.detail);
+      setStep('step-geofence', 'fail',
+        data.message || data.detail || 'Outside zone');
+      setStep('step-liveness', 'fail', 'Skipped');
+      setStep('step-face',     'fail', 'Skipped');
+      showResult(false, '✗ Outside classroom zone',
+        data.message || data.detail);
       return;
     }
 
     setStep('step-geofence', 'pass', data.message);
-    geoCheckPassed = true;
     startCamera();
   }
 
   // ── Camera ────────────────────────────────────────────────────────────────
 
   async function startCamera() {
-    setStep('step-face', 'checking', 'Starting camera…');
+    setStep('step-liveness', 'checking', 'Starting camera…');
     document.getElementById('cam-section').style.display = 'block';
 
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 }
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
       });
       const video = document.getElementById('video');
       video.srcObject = stream;
+
+      await new Promise(resolve => {
+        video.onloadedmetadata = () => { video.play(); resolve(); };
+      });
+
       video.classList.add('active');
       document.getElementById('cam-placeholder').style.display = 'none';
       document.getElementById('cam-overlay').style.display = 'block';
       document.getElementById('capture-btn').style.display = 'inline-flex';
-      setStep('step-face', 'checking', 'Look at the camera and press capture');
+      setStep('step-liveness', 'checking',
+        'Look at the camera and press capture');
+
     } catch (err) {
-      setStep('step-face', 'fail', 'Camera access denied');
-      showResult(false, '✗ Camera error', 'Please allow camera access and try again.');
+      setStep('step-liveness', 'fail', 'Camera access denied');
+      setStep('step-face',     'fail', 'Skipped');
+      showResult(false, '✗ Camera error',
+        'Please allow camera access and try again.');
     }
   }
 
@@ -383,7 +535,8 @@
     document.getElementById('retake-btn').style.display = 'none';
     document.getElementById('capture-btn').style.display = 'inline-flex';
     document.getElementById('result-card').className = 'result-card';
-    setStep('step-face', 'checking', 'Look at the camera and press capture');
+    setStep('step-liveness', 'checking', 'Look at the camera and press capture');
+    setStep('step-face',     'checking', 'Waiting…');
     startCamera();
   }
 
@@ -394,7 +547,12 @@
     const canvas = document.createElement('canvas');
     canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    // Mirror canvas to match mirrored video display
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
 
     capturedB64 = canvas.toDataURL('image/jpeg', 0.92);
 
@@ -405,10 +563,10 @@
     document.getElementById('video').classList.remove('active');
     document.getElementById('cam-overlay').style.display = 'none';
     document.getElementById('capture-btn').style.display = 'none';
-    document.getElementById('retake-btn').style.display = 'inline-flex';
+    document.getElementById('retake-btn').style.display  = 'inline-flex';
     stopCamera();
 
-    // ── Step 1: Liveness check ──────────────────────────────────────────────
+    // ── Liveness check ──────────────────────────────────────────────────────
     setStep('step-liveness', 'checking', 'Checking liveness…');
 
     const livenessRes = await Auth.fetch('/api/liveness/check', {
@@ -418,15 +576,18 @@
     const livenessData = await livenessRes.json();
 
     if (!livenessRes.ok) {
-      setStep('step-liveness', 'fail', livenessData.detail || 'Liveness check failed');
-      setStep('step-face', 'fail', 'Skipped — liveness failed');
-      showResult(false, '✗ Liveness check failed', livenessData.detail || 'Please try again with a live camera.');
+      setStep('step-liveness', 'fail',
+        livenessData.detail || 'Liveness check failed');
+      setStep('step-face', 'fail', 'Skipped');
+      showResult(false, '✗ Liveness check failed',
+        livenessData.detail || 'Please try again with good lighting.');
       return;
     }
 
-    setStep('step-liveness', 'pass', `Live — ${livenessData.confidence}% confidence`);
+    setStep('step-liveness', 'pass',
+      `Live — ${livenessData.confidence}% confidence`);
 
-    // ── Step 2: Full attendance mark (geofence + face + record) ────────────
+    // ── Full attendance mark ────────────────────────────────────────────────
     setStep('step-face', 'checking', 'Verifying face…');
 
     const res = await Auth.fetch('/api/attendance/mark', {
@@ -445,16 +606,20 @@
 
     if (!res.ok) {
       setStep('step-face', 'fail', data.detail || 'Verification failed');
-      showResult(false, '✗ Attendance not marked', data.detail || 'Please try again.');
+      showResult(false, '✗ Attendance not marked',
+        data.detail || 'Please try again.');
       return;
     }
 
-    setStep('step-face', 'pass', `Verified — ${data.face_confidence}% confidence`);
+    setStep('step-face', 'pass',
+      `Verified — ${data.face_confidence}% confidence`);
     showResult(
       true,
       '✅ Attendance marked!',
       `${data.course_code} — ${data.course_title}`,
-      `Distance: ${data.distance_m}m · Face: ${data.face_confidence}% · Liveness: ${data.liveness_confidence}% · ${new Date(data.marked_at).toLocaleTimeString()}`
+      `Distance: ${data.distance_m}m · Face: ${data.face_confidence}% · ` +
+      `Liveness: ${data.liveness_confidence}% · ` +
+      `${new Date(data.marked_at).toLocaleTimeString()}`
     );
 
     document.getElementById('retake-btn').style.display = 'none';
@@ -465,13 +630,15 @@
   function getDeviceId() {
     let id = localStorage.getItem('att_device_id');
     if (!id) {
-      id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      id = crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
       localStorage.setItem('att_device_id', id);
     }
     return id;
   }
 
-  // ── UI helpers ────────────────────────────────────────────────────────────
+  // ── UI helpers ─────────────────────────────────────────────────────────────
 
   function setStep(id, status, detail) {
     const el       = document.getElementById(id);
@@ -490,107 +657,6 @@
     document.getElementById('result-msg').textContent   = msg;
     document.getElementById('result-meta').textContent  = meta;
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  function submitToken() {
-    const val = document.getElementById('token-input').value.trim();
-    if (!val) { showAlert('alert', 'Please enter a token', 'error'); return; }
-    qrToken = val;
-    document.getElementById('token-entry').style.display = 'none';
-    loadSession();
-  }
-
-  // ── Tab switching ─────────────────────────────────────────────────────────
-
-  function switchTab(tab) {
-    const isScan = tab === 'scan';
-    document.getElementById('panel-scan').style.display   = isScan ? 'block' : 'none';
-    document.getElementById('panel-manual').style.display = isScan ? 'none'  : 'block';
-
-    const scanTab   = document.getElementById('tab-scan');
-    const manualTab = document.getElementById('tab-manual');
-
-    scanTab.style.background   = isScan ? 'var(--bg2)' : 'transparent';
-    scanTab.style.color        = isScan ? 'var(--text)' : 'var(--text2)';
-    scanTab.style.border       = isScan ? '1px solid var(--border2)' : 'none';
-    manualTab.style.background = isScan ? 'transparent' : 'var(--bg2)';
-    manualTab.style.color      = isScan ? 'var(--text2)' : 'var(--text)';
-    manualTab.style.border     = isScan ? 'none' : '1px solid var(--border2)';
-
-    if (!isScan) stopQRScan();
-  }
-
-  // ── QR scan via jsQR ──────────────────────────────────────────────────────
-
-  let scanStream   = null;
-  let scanInterval = null;
-
-  async function startQRScan() {
-    document.getElementById('scan-status').textContent = 'Starting camera…';
-    try {
-      scanStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }  // rear camera on phones
-      });
-      const video = document.getElementById('scan-video');
-      video.srcObject = scanStream;
-      video.style.display = 'block';
-      document.getElementById('scan-placeholder').style.display = 'none';
-      document.getElementById('scan-overlay').style.display = 'flex';
-      document.getElementById('start-scan-btn').style.display = 'none';
-      document.getElementById('stop-scan-btn').style.display  = 'inline-flex';
-      document.getElementById('scan-status').textContent = 'Scanning… point at QR code';
-
-      // Poll every 300ms
-      scanInterval = setInterval(() => scanFrame(video), 300);
-
-    } catch (err) {
-      document.getElementById('scan-status').textContent = 'Camera access denied — use manual entry';
-      switchTab('manual');
-    }
-  }
-
-  function stopQRScan() {
-    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-    if (scanStream)   { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
-    const video = document.getElementById('scan-video');
-    if (video) { video.style.display = 'none'; video.srcObject = null; }
-    const placeholder = document.getElementById('scan-placeholder');
-    if (placeholder) placeholder.style.display = 'flex';
-    const startBtn = document.getElementById('start-scan-btn');
-    const stopBtn  = document.getElementById('stop-scan-btn');
-    if (startBtn) startBtn.style.display = 'block';
-    if (stopBtn)  stopBtn.style.display  = 'none';
-  }
-
-  function scanFrame(video) {
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
-    const canvas = document.getElementById('scan-canvas');
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    if (typeof jsQR === 'undefined') return;
-
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    });
-
-    if (code && code.data) {
-      document.getElementById('scan-status').textContent = '✅ QR code detected!';
-      stopQRScan();
-
-      // Extract token from URL or use raw data
-      let token = code.data;
-      if (token.includes('?token=')) {
-        token = token.split('?token=')[1];
-      }
-
-      qrToken = token;
-      document.getElementById('token-entry').style.display = 'none';
-      loadSession();
-    }
   }
 </script>
 </body>
